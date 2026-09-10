@@ -198,7 +198,9 @@ populate_flowbox(SlatetopApplication *self)
         else
             image = gtk_image_new_from_icon_name("application-x-executable",
                                                  GTK_ICON_SIZE_DIALOG);
-        gtk_box_pack_start(GTK_BOX(box), image, FALSE, FALSE, 0);
+
+       gtk_image_set_pixel_size(GTK_IMAGE(image), self->config->icon_size);
+       gtk_box_pack_start(GTK_BOX(box), image, FALSE, FALSE, 0);
 
         label = gtk_label_new(app->name);
         gtk_label_set_xalign(GTK_LABEL(label), 0.5);

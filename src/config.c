@@ -25,6 +25,7 @@ slatetop_config_set_defaults(SlatetopConfig *c)
     c->opacity          = 0.85;
     c->font_size   = 14;
     c->label_size  = 14;
+    c->icon_size = 64;
 }
 
 SlatetopConfig *
@@ -87,6 +88,11 @@ slatetop_config_load(void)
     c->label_size = g_key_file_get_integer(kf, "Appearance", "label_size", NULL);
     if (c->label_size <= 0)
         c->label_size = 14;
+
+    c->icon_size = g_key_file_get_integer(kf, "Appearance", "icon_size", NULL);
+    if (c->icon_size <= 0)
+       c->icon_size = 64;
+
     return c;
 }
 
