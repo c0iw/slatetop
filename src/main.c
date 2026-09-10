@@ -7,13 +7,19 @@
 #include "slatetop.h"
 #include "desktop.h"
 #include "cache.h"
+#include "config.h"
 
 int
 main (int argc, char *argv[])
 {
   g_autoptr(SlatetopApplication) app = NULL;
+  g_autoptr(SlatetopConfig) config = NULL;
   GList *list;
   int status;
+
+  config = slatetop_config_load();
+  g_print("[config] font=%s columns=%d opacity=%.2f\n",
+           config->font, config->columns, config->opacity);
 
   if (slatetop_cache_is_valid()) {
     list = slatetop_cache_load();
