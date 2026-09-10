@@ -6,23 +6,28 @@
 #include <gtk/gtk.h>
 #include "slatetop.h"
 #include "desktop.h"
+#include "cache.h"
 
 int
 main (int argc, char *argv[])
 {
   g_autoptr(SlatetopApplication) app = NULL;
-  g_autoptr(GList) list = NULL;
-  GList *l;
+  GList *list;
   int status;
 
-  list = slatetop_app_list_load ();
-  for (l = list; l != NULL; l = l->next) {
-    SlatetopApp *a = l->data;
-    g_print ("%s  ->  %s\n", a->name, a->exec);
+  if (slatetop_cache_is_valid()) {
+    list = slatetop_cache_load();
+    g_print("[cache] loaded\n");
+  } else {
+    list = slatetop_app_list_load();
+    slatetop_cache_save(list);
+    g_print("[cache] rebuilt\n");
   }
 
-  app = slatetop_application_new ();
-  status = g_application_run (G_APPLICATION (app), argc, argv);
+  slatetop_app_list_free(list);
+
+  app = slatetop_application_new();
+  status = g_application_run(G_APPLICATION(app), argc, argv);
 
   return status;
 }
