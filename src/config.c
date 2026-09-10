@@ -23,6 +23,8 @@ slatetop_config_set_defaults(SlatetopConfig *c)
     c->fg_color         = g_strdup("#ffffff");
     c->selection_color  = g_strdup("#b4b4b4");
     c->opacity          = 0.85;
+    c->font_size   = 14;
+    c->label_size  = 14;
 }
 
 SlatetopConfig *
@@ -78,6 +80,13 @@ slatetop_config_load(void)
     if (c->window_height <= 0)
         c->window_height = 600;
 
+    c->font_size = g_key_file_get_integer(kf, "Appearance", "font_size", NULL);
+    if (c->font_size <= 0)
+        c->font_size = 14;
+
+    c->label_size = g_key_file_get_integer(kf, "Appearance", "label_size", NULL);
+    if (c->label_size <= 0)
+        c->label_size = 14;
     return c;
 }
 

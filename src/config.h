@@ -11,6 +11,8 @@ G_BEGIN_DECLS
 
 typedef struct {
     char    *font;
+    int      font_size;
+    int      label_size;
     int      window_width;
     int      window_height;
     gboolean fullscreen;
