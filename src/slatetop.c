@@ -35,7 +35,7 @@ launch_app(SlatetopApp *app)
 
     cmd = g_strdup(app->exec);
 
-    /* Убираем плейсхолдеры %u %U %f %F и т.д. */
+    /* Remove placeholders like %u %U %f %F */
     p = strstr(cmd, "%");
     while (p != NULL) {
         if (p[1] == 'u' || p[1] == 'U' || p[1] == 'f' || p[1] == 'F' ||
@@ -51,47 +51,110 @@ launch_app(SlatetopApp *app)
     gtk_window_close(GTK_WINDOW(((SlatetopApplication *)g_application_get_default())->window));
 }
 
-static void
-filter_apps(SlatetopApplication *self, const char *text)
+static int
+fuzzy_score(const char *text, const char *pattern)
 {
-    GList *children;
+    if (*pattern == '\0')
+        return 1;
+
+    int score = 0;
+    int prev_match = -2;
+    int pos = 0;
+    const char *t = text;
+    const char *p = pattern;
+
+    while (*t != '\0' && *p != '\0') {
+        char tc = g_ascii_tolower(*t);
+        char pc = g_ascii_tolower(*p);
+
+        if (tc == pc) {
+            score += 10;
+            if (pos == prev_match + 1)
+                score += 15;
+            if (pos == 0 || text[pos - 1] == ' ' ||
+                text[pos - 1] == '-' || text[pos - 1] == '_')
+                score += 20;
+            prev_match = pos;
+            p++;
+        }
+        t++;
+        pos++;
+    }
+    return (*p == '\0') ? score : 0;
+}
+
+typedef struct {
+    GtkWidget *child;
+    int        score;
+} ScoredChild;
+
+static gint
+compare_scored(gconstpointer a, gconstpointer b)
+{
+    const ScoredChild *sa = a;
+    const ScoredChild *sb = b;
+    return sb->score - sa->score;
+}
+
+static void
+filter_apps(GtkEntry *entry, gpointer user_data)
+{
+    const char *text = gtk_entry_get_text(entry);
+    GtkFlowBox *box = GTK_FLOW_BOX(user_data);
+    GList *children = gtk_container_get_children(GTK_CONTAINER(box));
     GList *l;
+    int n = g_list_length(children);
+    int i = 0;
     GtkFlowBoxChild *first_visible = NULL;
 
-    children = gtk_container_get_children(GTK_CONTAINER(self->flowbox));
+    ScoredChild *scored = g_new0(ScoredChild, n);
 
     for (l = children; l != NULL; l = l->next) {
         GtkWidget *child = GTK_WIDGET(l->data);
         SlatetopApp *app = g_object_get_data(G_OBJECT(child), "app");
-        gboolean visible;
+        int score;
 
-        if (text == NULL || *text == '\0') {
-            visible = TRUE;
-        } else {
-            visible = (g_strstr_len(app->name, -1, text) != NULL);
-        }
+        if (text == NULL || *text == '\0')
+            score = 1;
+        else
+            score = fuzzy_score(app->name, text);
 
-        gtk_widget_set_visible(child, visible);
-
-        if (visible && first_visible == NULL)
-            first_visible = GTK_FLOW_BOX_CHILD(child);
+        scored[i].child = child;
+        scored[i].score = score;
+        i++;
     }
 
+    qsort(scored, n, sizeof(ScoredChild), compare_scored);
+
+    for (l = children; l != NULL; l = l->next) {
+        g_object_ref(l->data);
+        gtk_container_remove(GTK_CONTAINER(box), GTK_WIDGET(l->data));
+    }
+
+    for (i = 0; i < n; i++) {
+        gboolean visible = (scored[i].score > 0);
+        gtk_container_add(GTK_CONTAINER(box), scored[i].child);
+        gtk_widget_set_visible(scored[i].child, visible);
+        if (visible && first_visible == NULL)
+            first_visible = GTK_FLOW_BOX_CHILD(scored[i].child);
+        g_object_unref(scored[i].child);
+    }
+
+    g_free(scored);
     g_list_free(children);
 
     if (first_visible != NULL)
-        gtk_flow_box_select_child(GTK_FLOW_BOX(self->flowbox), first_visible);
+        gtk_flow_box_select_child(box, first_visible);
     else
-        gtk_flow_box_unselect_all(GTK_FLOW_BOX(self->flowbox));
+        gtk_flow_box_unselect_all(box);
 }
 
 static void
 on_entry_changed(GtkEntry *entry, gpointer user_data)
 {
     SlatetopApplication *self = user_data;
-    const char *text = gtk_entry_get_text(entry);
 
-    filter_apps(self, text);
+    filter_apps(entry, self->flowbox);
 }
 
 static void
@@ -239,7 +302,7 @@ slatetop_application_activate(GApplication *app)
     GdkScreen *screen;
     GdkVisual *visual;
 
-    /* --- Загрузка конфига и приложений --- */
+    /* --- Load config and applications --- */
     self->config = slatetop_config_load();
 
     if (slatetop_cache_is_valid())
@@ -249,7 +312,7 @@ slatetop_application_activate(GApplication *app)
         slatetop_cache_save(self->apps);
     }
 
-    /* --- Окно --- */
+    /* --- Window --- */
     self->window = gtk_application_window_new(GTK_APPLICATION(app));
     g_signal_connect(self->window, "destroy",
                  G_CALLBACK(on_window_destroy), self);
@@ -282,9 +345,9 @@ slatetop_application_activate(GApplication *app)
         GTK_STYLE_PROVIDER_PRIORITY_USER + 1);
     g_object_unref(provider);
 
-    /* --- Поле поиска --- */
+    /* --- Search entry --- */
     self->entry = gtk_entry_new();
-    gtk_entry_set_placeholder_text(GTK_ENTRY(self->entry), "Поиск...");
+    gtk_entry_set_placeholder_text(GTK_ENTRY(self->entry), "Search...");
 
     /* --- FlowBox --- */
     self->flowbox = gtk_flow_box_new();
@@ -299,7 +362,7 @@ slatetop_application_activate(GApplication *app)
 
     populate_flowbox(self);
 
-    /* --- Компоновка --- */
+    /* --- Layout --- */
     vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
     gtk_container_set_border_width(GTK_CONTAINER(vbox), 20);
     gtk_box_pack_start(GTK_BOX(vbox), self->entry, FALSE, FALSE, 0);
@@ -312,7 +375,7 @@ slatetop_application_activate(GApplication *app)
 
     gtk_container_add(GTK_CONTAINER(self->window), vbox);
 
-    /* --- Сигналы --- */
+    /* --- Signals --- */
     g_signal_connect(self->entry, "changed",
                      G_CALLBACK(on_entry_changed), self);
     g_signal_connect(self->flowbox, "child-activated",
@@ -325,8 +388,7 @@ slatetop_application_activate(GApplication *app)
     gtk_widget_grab_focus(self->entry);
     gtk_widget_show_all(self->window);
 
-    /* Выделяем первый элемент */
-    filter_apps(self, "");
+    filter_apps(GTK_ENTRY(self->entry), self->flowbox);
 }
 
 static void
