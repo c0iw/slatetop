@@ -216,9 +216,22 @@ populate_flowbox(SlatetopApplication *self)
 }
 
 static void
+on_window_destroy(GtkWidget *widget, gpointer user_data)
+{
+    SlatetopApplication *self = SLATETOP_APPLICATION(user_data);
+    self->window = NULL;
+    (void)widget;
+}
+
+
+static void
 slatetop_application_activate(GApplication *app)
 {
     SlatetopApplication *self = SLATETOP_APPLICATION(app);
+    if (self->window != NULL) {
+        gtk_window_present(GTK_WINDOW(self->window));
+        return;
+    }
     GtkWidget *vbox;
     GtkWidget *scrolled;
     GtkCssProvider *provider;
@@ -238,6 +251,8 @@ slatetop_application_activate(GApplication *app)
 
     /* --- Окно --- */
     self->window = gtk_application_window_new(GTK_APPLICATION(app));
+    g_signal_connect(self->window, "destroy",
+                 G_CALLBACK(on_window_destroy), self);
     gtk_window_set_title(GTK_WINDOW(self->window), "Slatetop");
     gtk_window_set_decorated(GTK_WINDOW(self->window), FALSE);
 
